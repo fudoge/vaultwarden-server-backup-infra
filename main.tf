@@ -1,10 +1,5 @@
 terraform {
   backend "s3" {
-    bucket         = var.state_bucket_name
-    key            = "global/s3/terraform.tfstate"
-    region         = var.region
-    dynamodb_table = var.state_dynamodb_table
-    encrypt        = true
   }
 }
 
