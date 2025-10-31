@@ -41,12 +41,12 @@ resource "aws_s3_bucket_lifecycle_configuration" "backup_lifecycle" {
     }
 
     transition {
-      days          = 0
-      storage_class = "GLACIER_IR"
+      days          = 2
+      storage_class = "DEEP_ARCHIVE"
     }
 
     expiration {
-      days = 365
+      days = 180
     }
   }
 }
