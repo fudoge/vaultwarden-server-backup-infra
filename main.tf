@@ -76,14 +76,6 @@ resource "aws_iam_user" "vw_backup_usr" {
   }
 }
 
-resource "aws_iam_access_key" "vw_backup_usr_k" {
-  user   = aws_iam_user.vw_backup_usr.name
-  status = "Active"
-  lifecycle {
-    prevent_destroy = true
-  }
-}
-
 data "aws_iam_policy_document" "vw_backup_min" {
   statement {
     sid       = "S3ListBucketForPrefix"
