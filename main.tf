@@ -3,6 +3,7 @@ terraform {
   }
 }
 
+// S3 bucket
 resource "aws_s3_bucket" "vaultwarden_backup" {
   bucket = var.backup_bucket_name
 
@@ -51,6 +52,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "backup_lifecycle" {
   }
 }
 
+
+// SNS
 resource "aws_sns_topic" "email_notifications" {
   name = "noti-on-backup-failure-topic"
 }
@@ -59,4 +62,73 @@ resource "aws_sns_topic_subscription" "admin_email_subscription" {
   topic_arn = aws_sns_topic.email_notifications.arn
   protocol  = "email"
   endpoint  = var.notification_email
+}
+
+// IAM user to backup
+resource "aws_iam_user" "vw_backup_usr" {
+  name = "vaultwarden-backup-usr"
+  path = "/"
+
+  tags = {
+    Purpose   = "backup"
+    Service   = "vaultwarden"
+    ManagedBy = "terraform"
+  }
+}
+
+resource "aws_iam_access_key" "vw_backup_usr_k" {
+  user   = aws_iam_user.vw_backup_usr.name
+  status = "Active"
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+data "aws_iam_policy_document" "vw_backup_min" {
+  statement {
+    sid       = "S3ListBucketForPrefix"
+    actions   = ["s3:ListBucket", "s3:GetBucketLocation"]
+    resources = [aws_s3_bucket.vaultwarden_backup.arn]
+
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["*"]
+    }
+  }
+
+  statement {
+    sid       = "S3ListBucketMultipartUploads"
+    actions   = ["s3:ListBucketMultipartUploads"]
+    resources = [aws_s3_bucket.vaultwarden_backup.arn]
+  }
+
+  statement {
+    sid = "S3ObjectCpOnly"
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:AbortMultipartUpload",
+      "s3:ListMultiPartUploadParts",
+    ]
+    resources = ["${aws_s3_bucket.vaultwarden_backup.arn}/*"]
+  }
+
+  statement {
+    sid       = "SnsPublishOnly"
+    actions   = ["sns:Publish"]
+    resources = [aws_sns_topic.email_notifications.arn]
+  }
+}
+
+resource "aws_iam_policy" "vw_backup_min" {
+  name   = "vw-backup-minimal"
+  policy = data.aws_iam_policy_document.vw_backup_min.json
+}
+
+resource "aws_iam_user_policy_attachment" "vw_backup_attach" {
+  user       = aws_iam_user.vw_backup_usr.name
+  policy_arn = aws_iam_policy.vw_backup_min.arn
+
+
 }
